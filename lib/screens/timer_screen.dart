@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,7 +14,7 @@ class TimerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(timerProvider);
 
-    // 완료 감지 → 완료 다이얼로그 표시
+    // 완료 감지
     ref.listen<TimerState>(timerProvider, (prev, next) {
       if (!(prev?.isCompleted ?? false) && next.isCompleted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -38,28 +39,13 @@ class TimerScreen extends ConsumerWidget {
           child: SafeArea(
             child: Column(
               children: [
-                // ── 상단: 구간 정보 ────────────────────────
-                Expanded(
-                  flex: 2,
-                  child: _TopInfo(state: state),
-                ),
-
-                // ── 중앙: 남은 시간 (최대한 크게) ─────────
-                Expanded(
-                  flex: 5,
-                  child: _TimerDisplay(seconds: state.remainingSeconds),
-                ),
-
-                // ── 하단: 컨트롤 버튼 ─────────────────────
-                Expanded(
-                  flex: 2,
-                  child: _Controls(
-                    state: state,
-                    onPauseToggle: () =>
-                        ref.read(timerProvider.notifier).togglePause(),
-                    onStop: () => _handleBackPress(context, ref),
-                  ),
-                ),
+                Expanded(flex: 2, child: _TopInfo(state: state)),
+                Expanded(flex: 5, child: Center(child: _CircularTimer(state: state))),
+                Expanded(flex: 2, child: _Controls(
+                  state: state,
+                  onPauseToggle: () => ref.read(timerProvider.notifier).togglePause(),
+                  onStop: () => _handleBackPress(context, ref),
+                )),
               ],
             ),
           ),
@@ -68,43 +54,32 @@ class TimerScreen extends ConsumerWidget {
     );
   }
 
-  // ─── 뒤로 가기 처리 ─────────────────────────────────────
-
-  Future<void> _handleBackPress(
-      BuildContext context, WidgetRef ref) async {
+  Future<void> _handleBackPress(BuildContext context, WidgetRef ref) async {
     final shouldStop = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1C1C2E),
-        title: const Text('타이머 중단',
-            style: TextStyle(color: Colors.white)),
-        content: const Text(
-          '타이머를 중단하고 처음으로 돌아갈까요?',
-          style: TextStyle(color: Colors.white70),
-        ),
+        title: const Text('타이머 중단', style: TextStyle(color: Colors.white)),
+        content: const Text('타이머를 중단하고 처음으로 돌아갈까요?',
+            style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('계속하기',
-                style: TextStyle(color: Colors.white54)),
+            child: const Text('계속하기', style: TextStyle(color: Colors.white54)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-                backgroundColor: Colors.red.shade700),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
             child: const Text('중단'),
           ),
         ],
       ),
     );
-
     if (shouldStop == true && context.mounted) {
       ref.read(timerProvider.notifier).stop();
       Navigator.of(context).pop();
     }
   }
-
-  // ─── 완료 다이얼로그 ─────────────────────────────────────
 
   void _showCompletionDialog(BuildContext context, WidgetRef ref) {
     showDialog<void>(
@@ -113,12 +88,9 @@ class TimerScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1C1C2E),
         title: const Text('🎉 완료!',
-            style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text(
-          '모든 구간을 성공적으로 마쳤습니다!',
-          style: TextStyle(color: Colors.white70),
-        ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text('모든 라운드를 완료했습니다!',
+            style: TextStyle(color: Colors.white70)),
         actions: [
           FilledButton(
             onPressed: () {
@@ -126,8 +98,7 @@ class TimerScreen extends ConsumerWidget {
               ref.read(timerProvider.notifier).stop();
               if (context.mounted) Navigator.of(context).pop();
             },
-            style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF43A047)),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF43A047)),
             child: const Text('확인'),
           ),
         ],
@@ -136,7 +107,7 @@ class TimerScreen extends ConsumerWidget {
   }
 }
 
-// ─── 상단 구간 정보 ──────────────────────────────────────────
+// ─── 상단 라운드 정보 ─────────────────────────────────────────
 
 class _TopInfo extends StatelessWidget {
   final TimerState state;
@@ -147,21 +118,17 @@ class _TopInfo extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // 라운드 / 전체
         Text(
           state.progressLabel,
           style: TextStyle(
             color: Colors.white.withOpacity(0.6),
             fontSize: 18,
-            fontWeight: FontWeight.w300,
-            letterSpacing: 2,
+            letterSpacing: 3,
           ),
         ),
         const SizedBox(height: 8),
-        // 현재 단계 라벨
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             color: Colors.black26,
             borderRadius: BorderRadius.circular(20),
@@ -172,7 +139,6 @@ class _TopInfo extends StatelessWidget {
               color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              letterSpacing: 1,
             ),
           ),
         ),
@@ -181,40 +147,101 @@ class _TopInfo extends StatelessWidget {
   }
 }
 
-// ─── 남은 시간 표시 ─────────────────────────────────────────
+// ─── 원형 프로그래스바 + 시간 ─────────────────────────────────
 
-class _TimerDisplay extends StatelessWidget {
-  final int seconds;
-  const _TimerDisplay({required this.seconds});
+class _CircularTimer extends StatelessWidget {
+  final TimerState state;
+  const _CircularTimer({required this.state});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          _format(seconds),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 200,
-            fontWeight: FontWeight.bold,
-            height: 1.0,
+    final size = min(MediaQuery.of(context).size.width * 0.78, 300.0);
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // ── 원형 프로그래스바 (부드러운 애니메이션) ──────────
+          // key: 단계가 바뀔 때마다 새로 시작 (0에서 채워지도록)
+          TweenAnimationBuilder<double>(
+            key: ValueKey('${state.currentRound}_${state.phase.name}'),
+            tween: Tween<double>(begin: 0.0, end: state.progress),
+            // 1초 틱 사이를 보간 → 스타카토 없이 부드럽게
+            duration: const Duration(milliseconds: 950),
+            curve: Curves.linear,
+            builder: (context, animatedProgress, _) {
+              return CustomPaint(
+                size: Size(size, size),
+                painter: _ArcPainter(progress: animatedProgress),
+              );
+            },
           ),
-        ),
+          // ── 시간 텍스트 ───────────────────────────────────────
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Padding(
+              padding: EdgeInsets.all(size * 0.18),
+              child: Text(
+                state.formattedTime,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 80,
+                  fontWeight: FontWeight.bold,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-
-  String _format(int total) {
-    if (total < 60) return '$total';
-    final m = total ~/ 60;
-    final s = total % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
 }
 
-// ─── 컨트롤 버튼 영역 ────────────────────────────────────────
+class _ArcPainter extends CustomPainter {
+  final double progress;
+  static const double _stroke = 10.0;
+
+  const _ArcPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - _stroke;
+
+    // 배경 원
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = Colors.black26
+        ..strokeWidth = _stroke
+        ..style = PaintingStyle.stroke,
+    );
+
+    if (progress <= 0) return;
+
+    // 진행 arc (12시 방향에서 시계방향)
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -pi / 2,
+      2 * pi * progress.clamp(0.0, 1.0),
+      false,
+      Paint()
+        ..color = Colors.white.withOpacity(0.90)
+        ..strokeWidth = _stroke
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ArcPainter old) => old.progress != progress;
+}
+
+// ─── 컨트롤 버튼 ─────────────────────────────────────────────
 
 class _Controls extends StatelessWidget {
   final TimerState state;
@@ -232,25 +259,21 @@ class _Controls extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // 일시정지 / 재개
         _CircleBtn(
-          icon: state.isPaused
-              ? Icons.play_arrow_rounded
-              : Icons.pause_rounded,
+          icon: state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
           label: state.isPaused ? '재개' : '일시정지',
-          onPressed: state.isCompleted ? null : onPauseToggle,
           size: 72,
           iconSize: 36,
+          onPressed: state.isCompleted ? null : onPauseToggle,
         ),
         const SizedBox(width: 40),
-        // 중단 (처음으로)
         _CircleBtn(
           icon: Icons.stop_rounded,
           label: '중단',
-          onPressed: onStop,
           size: 60,
           iconSize: 28,
           faded: true,
+          onPressed: onStop,
         ),
       ],
     );
@@ -260,17 +283,17 @@ class _Controls extends StatelessWidget {
 class _CircleBtn extends StatelessWidget {
   final IconData icon;
   final String label;
-  final VoidCallback? onPressed;
   final double size;
   final double iconSize;
   final bool faded;
+  final VoidCallback? onPressed;
 
   const _CircleBtn({
     required this.icon,
     required this.label,
-    required this.onPressed,
     required this.size,
     required this.iconSize,
+    required this.onPressed,
     this.faded = false,
   });
 
@@ -282,36 +305,26 @@ class _CircleBtn extends StatelessWidget {
       children: [
         GestureDetector(
           onTap: onPressed,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+          child: Container(
             width: size,
             height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: enabled
-                  ? (faded ? Colors.black26 : Colors.black38)
-                  : Colors.black12,
+              color: enabled ? (faded ? Colors.black26 : Colors.black38) : Colors.black12,
               border: Border.all(
-                color: enabled
-                    ? (faded ? Colors.white30 : Colors.white60)
-                    : Colors.white12,
+                color: enabled ? (faded ? Colors.white30 : Colors.white60) : Colors.white12,
                 width: 1.5,
               ),
             ),
-            child: Icon(
-              icon,
-              size: iconSize,
-              color: enabled ? Colors.white : Colors.white30,
-            ),
+            child: Icon(icon,
+                size: iconSize, color: enabled ? Colors.white : Colors.white30),
           ),
         ),
         const SizedBox(height: 8),
         Text(
           label,
           style: TextStyle(
-            color: enabled ? Colors.white70 : Colors.white30,
-            fontSize: 12,
-          ),
+              color: enabled ? Colors.white70 : Colors.white30, fontSize: 12),
         ),
       ],
     );
